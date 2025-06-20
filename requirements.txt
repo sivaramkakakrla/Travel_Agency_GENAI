@@ -1,0 +1,13 @@
+langgraph>=0.0.15
+langchain>=0.1.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+pydantic
+openai>=1.0.0
+python-weather>=1.0.0
+forex-python>=1.8
+langchain-pinecone>=0.2.4
+langchain-openai>=0.1.0
+pinecone-client>=3.0.0
+langchain-groq>=0.1.0 
+python-dotenv
