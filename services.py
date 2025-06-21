@@ -27,24 +27,28 @@ class WeatherService:
             'appid': self.api_key,
             'units': 'metric'
         }
-        
         try:
             response = requests.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            
             if not data or 'main' not in data or 'weather' not in data or not data['weather']:
                 raise ValueError("Invalid weather data received")
-            
             return WeatherInfo(
                 temperature=float(data['main']['temp']),
                 condition=str(data['weather'][0]['main']),
                 humidity=float(data['main']['humidity']),
                 wind_speed=float(data['wind']['speed']),
-                forecast=[]  # You'll need to make another API call for forecast
+                forecast=[]
             )
-        except requests.RequestException as e:
-            raise Exception(f"Failed to fetch weather data: {str(e)}")
+        except Exception as e:
+            print(f"Weather data not available for {location.city}, {location.country}: {e}")
+            return WeatherInfo(
+                temperature=None,
+                condition="Not available",
+                humidity=None,
+                wind_speed=None,
+                forecast=[]
+            )
 
 class AttractionService:
     def __init__(self, api_key: str):
@@ -80,7 +84,7 @@ class AttractionService:
                         name=str(place['name']),
                         description=str(place.get('description', '')),
                         rating=float(place.get('rating', 0.0)),
-                        price_range=str(place.get('price_level', '$$')),
+                        price_range=str("10000"),#str(place.get('price_level', '$$')),
                         location={
                             'lat': float(place['geometry']['location']['lat']),
                             'lon': float(place['geometry']['location']['lng'])
@@ -120,7 +124,7 @@ class AttractionService:
                     restaurants.append(Restaurant(
                         name=str(place['name']),
                         cuisine=str(place.get('types', ['restaurant'])[0]),
-                        price_range=str(place.get('price_level', '$$')),
+                        price_range=str("10000"),#str(place.get('price_level', '$$')),
                         rating=float(place.get('rating', 0.0)),
                         location={
                             'lat': float(place['geometry']['location']['lat']),
@@ -177,89 +181,113 @@ class HotelService:
             raise ValueError("API key is required")
         self.api_key = api_key
         self.base_url = "https://booking-com.p.rapidapi.com/v1"
-        self.headers = {
-            'x-rapidapi-host': 'booking-com.p.rapidapi.com',
-            'x-rapidapi-key': self.api_key
+
+        querystring = {
+        "dest_id": "-2106102",  # New Delhi
+        "dest_type": "city",
+        "checkin_date": "2025-07-20",
+        "checkout_date": "2025-07-27",
+        "adults_number": "2",
+        "room_number": "1",
+        "order_by": "popularity",
+        "locale": "en-us",
+        "units": "metric",
+        "currency": "INR",
+        "filter_by_currency": "INR",
+        "page_number": "0",
+        "include_adjacency": "true"
         }
 
-    def get_city_id(self, city_name: str, country: str = None):
-        url = f"{self.base_url}/hotels/locations"
-        params = {
-            'name': city_name,
-            'locale': 'en-us'
+        self.headers = {
+        "X-RapidAPI-Key": "5bcd6ecf40mshd2edd4cde23e34ep1bac23jsn61b3c05af993",
+        "X-RapidAPI-Host": "booking-com.p.rapidapi.com"
         }
+
+    def get_city_info(self, city_name: str, country: str = None):
+        print("get_city_info..............")
+        url = f"{self.base_url}/hotels/locations"
+        #param = {'name': city_name, 'locale': 'en-us'}
+        param = {"name": city_name, "locale": "en-us"}
+
         try:
-            response = requests.get(url, headers=self.headers, params=params)
+            response = requests.get(url, headers=self.headers, params=param)
             response.raise_for_status()
             data = response.json()
-            print(f"Booking.com location lookup for {city_name}, {country}: {data}")  # Debug print
-            # Find the first city result
-            for item in data:
-                if item.get('dest_type') == 'city':
-                    if country is None or item.get('country') == country or country.lower() in item.get('country', '').lower():
-                        return item.get('dest_id')
-            # fallback: return first city
-            for item in data:
-                if item.get('dest_type') == 'city':
-                    return item.get('dest_id')
-            # Hardcoded fallback for Paris
-            if city_name.lower() == "paris":
-                return "20088325"
-            return None
+            for loc in data:
+                print(loc["name"], loc["dest_type"])
+            #if country is None or loc.get("country") == country:
+                city_id = loc.get("dest_id")
+                dest_type = loc.get("dest_type")
+                print("get_city_info..............11111111111111111")
+                print("******************************************************************")
+                return city_id, dest_type
+
         except Exception as e:
-            print(f"Error fetching city id for {city_name}: {e}")
-            # Hardcoded fallback for Paris
-            if city_name.lower() == "paris":
-                return "20088325"
-            return None
+            print(f"Error fetching city info for {city_name}: {e}")
+            return None, None
 
     async def search_hotels(self, location: Location, budget_range: tuple) -> List[Hotel]:
-        # Get correct city id
-        city_id = self.get_city_id(location.city, location.country)
-        if not city_id:
-            raise Exception(f"Could not find city id for {location.city}, {location.country}")
+        # Get correct city id and type
+        print("search_hotels................")
+        city_id, dest_type = self.get_city_info(location.city, location.country)
+        print("search_hotels................1111111111111111")
+        #if not city_id or not dest_type:
+         #   raise Exception(f"Could not find city id/type for {location.city}, {location.country}")
+        print("search_hotels................1111111111111111")
+        print(f"Using dest_id: {city_id}, dest_type: {dest_type} for hotel search")
+        print("search_hotels................1111111111111111")
         url = f"{self.base_url}/hotels/search"
-        params = {
-            'units': 'metric',
-            'room_number': '1',
-            'checkout_date': '2024-12-31',
-            'checkin_date': '2024-12-30',
-            'adults_number': '2',
-            'order_by': 'popularity',
-            'filter_by_currency': 'USD',
-            'locale': 'en-us',
-            'dest_type': 'city',
-            'dest_id': city_id,
-            'page_number': '0',
-            'categories_filter_ids': 'class::2,class::4,free_cancellation::1'
+        param = {
+            "units": "metric",
+            "room_number": "1",
+            "checkout_date": "2025-07-13",
+            "checkin_date": "2025-07-12",
+            "adults_number": "2",
+            "locale": "en-us",
+            "dest_type": dest_type,
+            "dest_id": city_id,
+            "page_number": "0",
+            "order_by": "popularity",
+            "currency": "INR",
+            "filter_by_currency": "INR",  # ✅ Required field
+            "include_adjacency": "true"
         }
         try:
-            response = requests.get(url, headers=self.headers, params=params)
+            response = requests.get(url, headers=self.headers, params=param)
             if response.status_code == 422:
                 raise Exception(f"Hotel search failed: Invalid city id or parameters for {location.city}, {location.country}")
-            response.raise_for_status()
+            #response.raise_for_status()
             data = response.json()
-            if not data or 'result' not in data:
-                return []
-            hotels = []
-            for hotel in data['result']:
-                try:
-                    price = float(hotel['price_breakdown']['gross_price'])
-                    if budget_range[0] <= price <= budget_range[1]:
-                        hotels.append(Hotel(
-                            name=str(hotel['hotel_name']),
-                            price_per_night=price,
-                            rating=float(hotel.get('review_score', 0.0)),
-                            amenities=[str(amenity) for amenity in hotel.get('hotel_amenities', [])],
-                            location={
-                                'lat': float(hotel['latitude']),
-                                'lon': float(hotel['longitude'])
-                            }
-                        ))
-                except (KeyError, ValueError) as e:
-                    print(f"Error processing hotel: {str(e)}")
-                    continue
-            return hotels
+            for hotel in data.get("result", []):
+                print(f"🏨 {hotel.get('hotel_name')}")
+                print(f"⭐ Rating: {hotel.get('review_score')}")
+                print(f"💰 Price: {hotel.get('price_breakdown', {}).get('gross_price')} {hotel.get('price_breakdown', {}).get('currency')}")
+                print(f"📍 Address: {hotel.get('address')}")
+                print("🖼️ Image:", hotel.get("main_photo_url"))
+                print("-" * 60)
+            #if not data or 'result' not in data:
+             #   return []
+            #hotels = []
+            #for hotel in data['result']:
+            #    try:
+            #        price = float(hotel['price_breakdown']['gross_price'])
+            #        if budget_range[0] <= price <= budget_range[1]:
+            #            hotels.append(Hotel(
+            #                name=str(hotel['hotel_name']),
+            #                price_per_night=price,
+            #                rating=float(hotel.get('review_score', 0.0)),
+            #                amenities=[str(amenity) for amenity in hotel.get('hotel_amenities', [])],
+            #                location={
+            #                    'lat': float(hotel['latitude']),
+            #                    'lon': float(hotel['longitude'])
+            #                }
+             #           ))
+            #    except (KeyError, ValueError) as e:
+            #        print(f"Error processing hotel: {str(e)}")
+            #        continue
+            #print("end....................")
+            #return hotels
+            return data.get("result", [])
         except requests.RequestException as e:
             raise Exception(f"Failed to fetch hotels: {str(e)}")
         except Exception as e:
@@ -267,6 +295,7 @@ class HotelService:
 
     async def get_hotel_availability(self, hotel_id: str, checkin_date: str, checkout_date: str) -> Dict:
         """Get hotel availability for specific dates"""
+        print("get_hotel_availability...............")
         url = f"{self.base_url}/hotels/calendar"
         params = {
             'hotel_id': hotel_id,
@@ -285,6 +314,7 @@ class HotelService:
 
     async def get_hotel_details(self, hotel_id: str) -> Dict:
         """Get detailed information about a specific hotel"""
+        print("get_hotel_details................")
         url = f"{self.base_url}/hotels/data"
         params = {
             'hotel_id': hotel_id,
@@ -359,9 +389,9 @@ class ItineraryService:
         print("ItineraryService....0")
         self.weather_service = WeatherService()
         print("ItineraryService....1")
-        self.attraction_service = AttractionService(os.getenv('ATTRACTION_API_KEY', ''))
+        self.attraction_service = AttractionService("AIzaSyAIzLkGwGb1KZzACP4ahKJHjD1fYsvRHik")
         print("ItineraryService....2")
-        self.hotel_service = HotelService(os.getenv('HOTEL_API_KEY', ''))
+        self.hotel_service = HotelService("5bcd6ecf40mshd2edd4cde23e34ep1bac23jsn61b3c05af993")
         print("ItineraryService....3")
         #self.transportation_service = TransportationService(os.getenv('TRANSPORTATION_API_KEY', ''))
         self.currency_service = CurrencyService()
@@ -378,7 +408,7 @@ class ItineraryService:
             activities = await self.attraction_service.search_activities(location)
             hotels = await self.hotel_service.search_hotels(location, (budget * 0.3, budget * 0.5))
             #transportation = await self.transportation_service.search_transportation(location)
-
+            print("Itenary........111111")
             # Create daily plans
             daily_plans = []
             current_date = start_date
@@ -391,13 +421,13 @@ class ItineraryService:
                 )
                 daily_plans.append(daily_plan)
                 current_date = current_date.replace(day=current_date.day + 1)
-
+            print("Itenary........22222222")
             # Calculate total cost
-            total_cost = sum(
-                float(hotel.price_per_night * (end_date - start_date).days)
-                for hotel in hotels
-            )
-
+            total_cost = 100000;#sum(
+                #float(hotel.price_per_night * (end_date - start_date).days)
+                #for hotel in hotels
+            #)
+            print("Itenary........3333333333")
             # Create itinerary
             itinerary = Itinerary(
                 location=location,
@@ -420,7 +450,7 @@ class ItineraryService:
                     #'transportation': sum(float(trans.cost) for trans in transportation)
                 }
             )
-
+            print("Itenary........444444444444")
             # Generate summary
             summary = f"Travel plan for {location.city}, {location.country}\n"
             summary += f"Duration: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n"
@@ -429,7 +459,7 @@ class ItineraryService:
             summary += f"Number of attractions: {len(attractions)}\n"
             summary += f"Number of restaurants: {len(restaurants)}\n"
             summary += f"Number of activities: {len(activities)}"
-
+            print("Itenary........555555555555555")
             travel_plan = TravelPlan(
                 itinerary=itinerary,
                 weather_forecast=weather,

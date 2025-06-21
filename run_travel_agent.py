@@ -33,9 +33,9 @@ async def main():
         print("\nGenerating travel plan...0000")
         # Define trip parameters
         location = Location(
-            city="Paris",
-            country="France",
-            coordinates={"lat": 48.8566, "lon": 2.3522}
+            city="New Delhi",
+            country="India",
+            #coordinates={"lat": 48.8566, "lon": 2.3522}
         )
         print("\nGenerating travel plan...11111")
         start_date = datetime.now() + timedelta(days=30)  # Trip starts in 30 days
